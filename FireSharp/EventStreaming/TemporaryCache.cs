@@ -111,6 +111,8 @@ namespace FireSharp.EventStreaming
                     case JsonToken.Null:
                         DeleteChild(root);
                         return;
+                    case JsonToken.EndObject:
+                        return;
                 }
             }
         }
@@ -183,7 +185,7 @@ namespace FireSharp.EventStreaming
 
         private void OnRemoved(ValueRemovedEventArgs args)
         {
-            Removed?.Invoke(this, args, Context);
+            //Removed?.Invoke(this, args, Context);
         }
 
         public event ValueAddedEventHandler Added;
