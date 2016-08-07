@@ -1,6 +1,7 @@
 ﻿using Common.Testing.NUnit;
 using FireSharp.Config;
 using FireSharp.Exceptions;
+using FireSharp.Extensions;
 using FireSharp.Interfaces;
 using FireSharp.Tests.Models;
 using NUnit.Framework;
@@ -36,6 +37,52 @@ namespace FireSharp.Tests
 
         protected override void FinalizeSetUp()
         {
+        }
+
+        [Test, Category("INTEGRATION"), Category("ASYNC")]
+        public async void PushAndListenAsync()
+        {
+            var todos = new[]
+            {
+            new Todo { name = "Execute PUSH4", priority = 1 },
+            new Todo { name = "Execute PUSH4 twice", priority = 2 },
+        };
+
+            var response = await _client.PushAsync("todos/push/pushAndListenAsync", todos[0]);
+            Assert.NotNull(response);
+            Assert.NotNull(response.Result);
+            Assert.NotNull(response.Result.Name); /*Returns pushed data name like -J8LR7PDCdz_i9H41kf7*/
+            Console.WriteLine(response.Result.Name);
+            response = await _client.PushAsync("todos/push/pushAndListenAsync", todos[1]);
+            Assert.NotNull(response);
+            Assert.NotNull(response.Result);
+            Assert.NotNull(response.Result.Name); /*Returns pushed data name like -J8LR7PDCdz_i9H41kf7*/
+            Console.WriteLine(response.Result.Name);
+
+            int onTodosCount = 0;
+
+            var listenResponse = _client.OnAsync("todos/push/pushAndListenAsync",
+                //added
+                (sender, args, context) =>
+                {
+                    Console.WriteLine(args.ToJson());
+                    Interlocked.Increment(ref onTodosCount);
+                },
+                //changed
+                (sender, args, context) =>
+                {
+                    Console.WriteLine(args.ToJson());
+                    Assert.Fail("nothing should have changed yet, only added");
+                },
+                // removed
+                (sender, args, context) =>
+                {
+                    Console.WriteLine(args.ToJson());
+                    Assert.Fail("nothing should have been removed, only added");
+                });
+
+            await Task.Delay(4000);
+            Assert.AreEqual(2, onTodosCount);
         }
 
         [Test, Category("INTEGRATION")]
