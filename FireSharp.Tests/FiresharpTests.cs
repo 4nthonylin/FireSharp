@@ -20,7 +20,7 @@ namespace FireSharp.Tests
         private IFirebaseClient _client;
 
         [TestFixtureSetUp]
-        public async void TestFixtureSetUp()
+        public void TestFixtureSetUp()
         {
             IFirebaseConfig config = new FirebaseConfig
             {
@@ -28,11 +28,9 @@ namespace FireSharp.Tests
                 BasePath = BasePath
             };
             _client = new FirebaseClient(config); //Uses Newtonsoft.Json Json Serializer
-
-            var task1 = _client.DeleteAsync("todos");
-            var task2 = _client.DeleteAsync("fakepath");
-
-            await Task.WhenAll(task1, task2);
+            _client.Delete("todos");
+            _client.Delete("fakepath");
+            Console.WriteLine("Test set-up completed");
         }
 
         protected override void FinalizeSetUp()
@@ -42,6 +40,30 @@ namespace FireSharp.Tests
         [Test, Category("INTEGRATION"), Category("ASYNC")]
         public async void PushAndListenAsync()
         {
+            await Task.Delay(1000);
+            int valueAdded = 0;
+            int valueChanged = 0;
+            int valueRemoved = 0;
+
+            var listenResponse = _client.OnAsync("todos/push/pushAndListenAsync",
+                //added
+                (sender, args, context) =>
+                {
+                    Console.WriteLine("value added: " + args.ToJson());
+                    Interlocked.Increment(ref valueAdded);
+                },
+                //changed
+                (sender, args, context) =>
+                {
+                    Console.WriteLine("value changed: " + args.ToJson());
+                    Interlocked.Increment(ref valueChanged);
+                },
+                // removed
+                (sender, args, context) =>
+                {
+                    Console.WriteLine("value removed: " + args.ToJson());
+                    Interlocked.Increment(ref valueRemoved);
+                });
             var todos = new[]
             {
             new Todo { name = "Execute PUSH4", priority = 1 },
@@ -59,30 +81,11 @@ namespace FireSharp.Tests
             Assert.NotNull(response.Result.Name); /*Returns pushed data name like -J8LR7PDCdz_i9H41kf7*/
             Console.WriteLine(response.Result.Name);
 
-            int onTodosCount = 0;
-
-            var listenResponse = _client.OnAsync("todos/push/pushAndListenAsync",
-                //added
-                (sender, args, context) =>
-                {
-                    Console.WriteLine(args.ToJson());
-                    Interlocked.Increment(ref onTodosCount);
-                },
-                //changed
-                (sender, args, context) =>
-                {
-                    Console.WriteLine(args.ToJson());
-                    Assert.Fail("nothing should have changed yet, only added");
-                },
-                // removed
-                (sender, args, context) =>
-                {
-                    Console.WriteLine(args.ToJson());
-                    Assert.Fail("nothing should have been removed, only added");
-                });
 
             await Task.Delay(4000);
-            Assert.AreEqual(2, onTodosCount);
+            Assert.AreEqual(2, valueAdded);
+            Assert.AreEqual(0, valueChanged);
+            Assert.AreEqual(0, valueRemoved);
         }
 
         [Test, Category("INTEGRATION")]
