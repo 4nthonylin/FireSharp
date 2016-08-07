@@ -1,6 +1,8 @@
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Text;
 
@@ -17,7 +19,6 @@ namespace FireSharp.EventStreaming
         public TemporaryCache()
         {
             Root.Name = string.Empty;
-            Root.Created = false;
             Root.Parent = null;
             Root.Name = null;
         }
@@ -29,21 +30,33 @@ namespace FireSharp.EventStreaming
 
         internal SimpleCacheItem Root { get; } = new SimpleCacheItem();
 
-        public void Replace(string path, JsonReader data)
+        public void Update(string path, JToken data, bool replace)
         {
             lock (_treeLock)
             {
                 var root = FindRoot(path);
-                Replace(root, data);
-            }
-        }
 
-        public void Update(string path, JsonReader data)
-        {
-            lock (_treeLock)
-            {
-                var root = FindRoot(path);
-                UpdateChildren(root, data);
+                if (replace)
+                {
+                    DeleteChild(root);
+
+                    root.Parent?.Children.Add(root);
+                }
+                foreach (JProperty prop in data.Children<JProperty>())
+                {
+                    using (var reader = new JsonTextReader(new StringReader(data.ToString())))
+                    {
+                        if (root.ContainsChildren(prop.Name))
+                        {
+
+                        }
+                        else
+                        {
+                            UpdateChildren(root, reader);
+                            OnAdded(new ValueAddedEventArgs(PathFromRoot(root), prop));
+                        }
+                    }
+                }
             }
         }
 
@@ -60,27 +73,15 @@ namespace FireSharp.EventStreaming
 
             if (newRoot == null)
             {
-                newRoot = new SimpleCacheItem {Name = segment, Parent = root, Created = true};
+                newRoot = new SimpleCacheItem {Name = segment, Parent = root};
                 root.Children.Add(newRoot);
             }
 
             return newRoot;
         }
 
-        private void Replace(SimpleCacheItem root, JsonReader reader)
+        private void UpdateChildren(SimpleCacheItem root, JsonTextReader reader)
         {
-            UpdateChildren(root, reader, true);
-        }
-
-        private void UpdateChildren(SimpleCacheItem root, JsonReader reader, bool replace = false)
-        {
-            if (replace)
-            {
-                DeleteChild(root);
-
-                root.Parent?.Children.Add(root);
-            }
-
             while (reader.Read())
             {
                 switch (reader.TokenType)
@@ -94,17 +95,15 @@ namespace FireSharp.EventStreaming
                     case JsonToken.Float:
                     case JsonToken.Integer:
                     case JsonToken.String:
-                        if (root.Created)
+                        if (string.IsNullOrEmpty(root.Value))
                         {
                             root.Value = reader.Value.ToString();
-                            OnAdded(new ValueAddedEventArgs(PathFromRoot(root), reader.Value.ToString()));
-                            root.Created = false;
                         }
                         else
                         {
                             var oldData = root.Value;
                             root.Value = reader.Value.ToString();
-                            OnUpdated(new ValueChangedEventArgs(PathFromRoot(root), root.Value, oldData));
+                            //OnUpdated(new ValueChangedEventArgs(PathFromRoot(root), root.Value, oldData));
                         }
 
                         return;

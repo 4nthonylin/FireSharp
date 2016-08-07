@@ -81,7 +81,7 @@ namespace FireSharp.Tests
                     Assert.Fail("nothing should have been removed, only added");
                 });
 
-            await Task.Delay(4000);
+            await Task.Delay(50000);
             Assert.AreEqual(2, onTodosCount);
         }
 

@@ -1,16 +1,17 @@
+using Newtonsoft.Json.Linq;
 using System;
 
 namespace FireSharp.EventStreaming
 {
     public class ValueAddedEventArgs : EventArgs
     {
-        public ValueAddedEventArgs(string path, string data)
+        public ValueAddedEventArgs(string path, JProperty data)
         {
             Path = path;
             Data = data;
         }
 
         public string Path { get; }
-        public string Data { get; }
+        public JProperty Data { get; }
     }
 }

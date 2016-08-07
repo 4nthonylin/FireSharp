@@ -1,5 +1,6 @@
 using FireSharp.EventStreaming;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using System;
 using System.Diagnostics;
 using System.IO;
@@ -104,21 +105,10 @@ namespace FireSharp.Response
             {
                 case "put":
                 case "patch":
-                    using (var reader = new JsonTextReader(new StringReader(p)))
-                    {
-                        ReadToNamedPropertyValue(reader, "path");
-                        reader.Read();
-                        var path = reader.Value.ToString();
-
-                        if (eventName == "put")
-                        {
-                            _cache.Replace(path, ReadToNamedPropertyValue(reader, "data"));
-                        }
-                        else
-                        {
-                            _cache.Update(path, ReadToNamedPropertyValue(reader, "data"));
-                        }
-                    }
+                    var data = JObject.Parse(p);
+                    string path = (string)data["path"];
+                    bool replace = eventName.Equals("put");
+                    _cache.Update(path, data["data"], replace);
                     break;
             }
         }
